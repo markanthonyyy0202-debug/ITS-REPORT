@@ -34,3 +34,6 @@ button.big{background:var(--amber);border:2px solid #e0a800;color:#1a1400;font:7
 .item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
 details{border-bottom:1px solid var(--line);padding:8px 0}
 summary{cursor:pointer;font-weight:600}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 10px}
+.tab{font:700 16px system-ui;padding:10px 20px;border:2px solid var(--green);background:transparent;color:var(--green);border-radius:4px;cursor:pointer}
+.tab.on{background:var(--green);color:#fff}

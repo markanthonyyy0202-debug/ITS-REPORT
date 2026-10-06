@@ -5,10 +5,10 @@ import { autoStatus, buildReport, STATUSES } from '@/lib/report';
 import Nav from './Nav';
 
 const todayStr = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-const blank = () => ({ location: '', date: todayStr(), wo: '', by: '', fault: '', finding: '', acts: [], rca: '', rcaOther: '', remarks: '', statusMode: 'auto' });
+const blank = () => ({ location: '', date: todayStr(), wo: '', by: '', fault: '', finding: '', cat: '', acts: [], rca: '', rcaOther: '', remarks: '', statusMode: 'auto' });
 
 export default function Home() {
-  const [faults, setFaults] = useState([]);
+  const [cats, setCats] = useState([]);
   const [rcas, setRcas] = useState([]);
   const [f, setF] = useState(blank());
   const [out, setOut] = useState('');
@@ -16,17 +16,17 @@ export default function Home() {
   const [toast, setToast] = useState('');
 
   useEffect(() => {
-    supabase.from('faults').select('*').order('created_at').then(({ data }) => setFaults(data || []));
+    supabase.from('action_categories').select('*').order('sort').then(({ data }) => setCats(data || []));
     supabase.from('rcas').select('*').order('created_at').then(({ data }) => setRcas(data || []));
   }, []);
 
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
-  const fault = faults.find((x) => x.name === f.finding);
+  const cat = cats.find((x) => x.name === f.cat);
   const rcaFinal = f.rca === 'Other' ? f.rcaOther.trim() : f.rca;
-  const suggested = useMemo(() => autoStatus(fault?.actions || [], f.acts, rcaFinal), [fault, f.acts, rcaFinal]);
+  const suggested = useMemo(() => autoStatus(f.acts, rcaFinal), [f.acts, rcaFinal]);
   const status = f.statusMode === 'auto' ? suggested : f.statusMode;
 
-  const pickFault = (name) => setF((p) => ({ ...p, finding: name, acts: [] }));
+  const pickCat = (name) => setF((p) => ({ ...p, cat: name, acts: [] }));
   const toggle = (a) => setF((p) => ({ ...p, acts: p.acts.includes(a) ? p.acts.filter((x) => x !== a) : [...p.acts, a] }));
   const say = (t) => { setToast(t); setTimeout(() => setToast(''), 2200); };
 
@@ -37,17 +37,17 @@ export default function Home() {
     if (!f.wo.trim()) m.push('Work Order');
     if (!f.fault.trim()) m.push('Reported Fault');
     if (!f.by.trim()) m.push('Reported By');
-    if (!f.finding) m.push('Initial Fault Finding');
+    if (!f.finding.trim()) m.push('Initial Fault Finding');
     if (!f.acts.length) m.push('At least one Action Taken');
     if (!f.rca) m.push('RCA'); else if (f.rca === 'Other' && !f.rcaOther.trim()) m.push('RCA (enter the RCA)');
     setErrs(m);
     if (m.length) return;
     // keep checklist order in the report
-    const acts = fault.actions.filter((a) => f.acts.includes(a));
-    const text = buildReport({ location: f.location.trim(), date: f.date, wo: f.wo.trim(), by: f.by.trim(), fault: f.fault.trim(), finding: f.finding, acts, rca: rcaFinal, status, remarks: f.remarks.trim() });
+    const acts = (cat?.actions || []).filter((a) => f.acts.includes(a));
+    const text = buildReport({ location: f.location.trim(), date: f.date, wo: f.wo.trim(), by: f.by.trim(), fault: f.fault.trim(), finding: f.finding.trim(), acts, rca: rcaFinal, status, remarks: f.remarks.trim() });
     setOut(text);
     // save a copy for the team history (best effort)
-    await supabase.from('reports').insert({ location: f.location.trim(), report_date: f.date, work_order: f.wo.trim(), reported_by: f.by.trim(), reported_fault: f.fault.trim(), finding: f.finding, actions: acts, rca: rcaFinal, status, remarks: f.remarks.trim() || null, report_text: text });
+    await supabase.from('reports').insert({ location: f.location.trim(), report_date: f.date, work_order: f.wo.trim(), reported_by: f.by.trim(), reported_fault: f.fault.trim(), finding: f.finding.trim(), actions: acts, rca: rcaFinal, status, remarks: f.remarks.trim() || null, report_text: text });
   }
 
   async function copy() {
@@ -74,17 +74,18 @@ export default function Home() {
 
         <section>
           <h2>2. Initial fault finding</h2>
-          <select value={f.finding} onChange={(e) => pickFault(e.target.value)} aria-label="Initial fault finding">
-            <option value="">Select fault finding</option>
-            {faults.map((x) => <option key={x.id} value={x.name}>{x.name}</option>)}
-          </select>
+          <input value={f.finding} onChange={(e) => set('finding', e.target.value)} aria-label="Initial fault finding" placeholder="Type the initial fault finding" />
         </section>
 
         <section>
           <h2>3. Action taken</h2>
-          {!fault && <p className="hint">Select a fault finding to see its checklist. Tick only what was actually done.</p>}
+          <div className="tabs" role="group" aria-label="Category">
+            {cats.map((c) => <button key={c.id} type="button" className={'tab' + (f.cat === c.name ? ' on' : '')} aria-pressed={f.cat === c.name} onClick={() => pickCat(c.name)}>{c.name}</button>)}
+          </div>
+          {!cat && <p className="hint">Select a category, then tick only what was actually done.</p>}
+          {cat && !cat.actions.length && <p className="hint">No actions added for this category yet.</p>}
           <div className="checks">
-            {fault?.actions.map((a) => (
+            {cat?.actions.map((a) => (
               <label key={a} className={f.acts.includes(a) ? 'on' : ''}>
                 <input type="checkbox" checked={f.acts.includes(a)} onChange={() => toggle(a)} />{a}
               </label>
