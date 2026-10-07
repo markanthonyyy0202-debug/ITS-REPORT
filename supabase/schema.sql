@@ -6,11 +6,8 @@ create table if not exists action_categories (
   actions text[] not null default '{}',
   created_at timestamptz default now()
 );
-create table if not exists rcas (
-  id uuid primary key default gen_random_uuid(),
-  name text unique not null,
-  created_at timestamptz default now()
-);
+alter table action_categories add column if not exists rca_options text[] not null default '{}';
+
 create table if not exists reports (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz default now(),
@@ -21,16 +18,13 @@ create table if not exists reports (
 );
 
 alter table action_categories enable row level security;
-alter table rcas enable row level security;
 alter table reports enable row level security;
 
 -- No login: anyone with the app link can use the data
 drop policy if exists "cats all" on action_categories;
-drop policy if exists "rcas all" on rcas;
 drop policy if exists "reports read" on reports;
 drop policy if exists "reports insert" on reports;
 create policy "cats all" on action_categories for all to anon, authenticated using (true) with check (true);
-create policy "rcas all" on rcas for all to anon, authenticated using (true) with check (true);
 create policy "reports read" on reports for select to anon, authenticated using (true);
 create policy "reports insert" on reports for insert to anon, authenticated with check (true);
 
@@ -173,4 +167,87 @@ insert into action_categories (name, sort, actions) values
 ])
 -- fills a category only while it is still empty, so later edits are never overwritten
 on conflict (name) do update set actions = excluded.actions where action_categories.actions = '{}';
-insert into rcas (name) values ('Communication Issue'),('RGB Issue'),('POE Not Working') on conflict (name) do nothing;
+
+-- Root cause lists per category (fills a category only while its RCA list is still empty)
+update action_categories set rca_options = array[
+'LED module failure',
+'Replace defective NTCIP Controller failure',
+'LCD Screen Controller failure',
+'Service board failure',
+'CAT6 cable failure',
+'Replace defective Fan sensor and install new unit',
+'Replace defective CONV Board and install new unit',
+'V1044 row controller failure',
+'0511 CPU Board failrue',
+'0428 CPU Board failure',
+'Temperature sensor failure',
+'Light sensor failure',
+'Axial Fan failure',
+'Communication issue',
+'Power Surge or Electrical Tripping',
+'CAT6 cable Physical Layer & Cabling Issues',
+'RJ45 Connector Failure',
+'Firmware/Software failure',
+'Power Interruption',
+'Environmental Conditions(Excessive heat, dust, humidity, vibration, or corrosion)',
+'DC Power supply 12V failure',
+'DC Power supply 3.3V failure',
+'DC Power supply 5V failure',
+'Network Connection Failure',
+'MCB/Breaker Tripped',
+'Controller-to-Display Communication Failure',
+'Cable/Termination Fault(Loose, damaged, or corroded power/data connections)',
+'Power supply failure'
+]
+where name = 'AESYS' and rca_options = '{}';
+update action_categories set rca_options = array[
+'LED module failure',
+'LEX Controller failure',
+'LCD Screen Controller failure',
+'MCB/Breaker Tripped',
+'Controller-to-Display Communication Failure',
+'Power supply failure',
+'Communication issue',
+'Power Surge or Electrical Tripping',
+'RJ45 Connector Failure',
+'Firmware/Software failure',
+'Power Interruption',
+'Environmental Conditions(Excessive heat, dust, humidity, vibration, or corrosion)',
+'CAN Interface Card failure',
+'OVPS Modular sign failure',
+'LED Module power cable failure',
+'CAT6 cable Physical Layer & Cabling Issues from CAN Interface',
+'CAT6 cable Physical Layer & Cabling Issues from block terminal',
+'CAT6 cable Physical Layer & Cabling Issues from OVPS modular sign',
+'CAT6 cable Physical Layer & Cabling Issues',
+'Cable/Termination Fault(Loose, damaged, or corroded power/data connections)'
+]
+where name = 'TELEGRA' and rca_options = '{}';
+update action_categories set rca_options = array[
+'CCTV camera failure',
+'PoE injector failure',
+'Longspan extender failure',
+'CLD failure',
+'CAT6 cable failure',
+'Network Interface Card Failure',
+'Communication issue',
+'Surface Damage from bubble lens dome',
+'Outdated firmware version',
+'Power Surge or Electrical Tripping',
+'CAT6 cable Physical Layer & Cabling Issues',
+'RJ45 Connector Failure',
+'Firmware Crash / Freezing',
+'Thermal/Environmental Breakdown(Cause of extreme heat or moisture)',
+'PTZ mechanical failure',
+'Camera Overheating',
+'Camera Firmware Issue',
+'High CPU/Memory Usage',
+'CCTV camera Hardware Failure',
+'Network Switch/Port Fault',
+'Water/Moisture Ingress from network interface card',
+'Water/Moisture Ingress from CCTV camera(Moisture enters camera, junction box, connector, or cable termination)',
+'Firmware/Software Issue',
+'Power Interruption',
+'Environmental Conditions(Excessive heat, dust, humidity, vibration, or corrosion)'
+]
+where name = 'CCTV' and rca_options = '{}';
