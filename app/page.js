@@ -107,7 +107,7 @@ export default function Home() {
           <h2>5. Status &amp; remarks</h2>
           <label htmlFor="st">Status</label>
           <select id="st" value={f.statusMode} onChange={(e) => set('statusMode', e.target.value)}>
-            <option value="auto">Automatic</option>
+            <option value="auto">SELECT</option>
             {STATUSES.map((s) => <option key={s}>{s}</option>)}
           </select>
           <p className="hint">Suggested status: <span className="badge">{suggested}</span></p>
