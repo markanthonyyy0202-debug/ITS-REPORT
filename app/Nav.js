@@ -7,7 +7,7 @@ export default function Nav() {
       <nav>
         <Link href="/">New report</Link>
         <Link href="/history">History</Link>
-        <Link href="/admin">Manage actions &amp; RCA</Link>
+        <Link href="/admin">Manage actions & RCA</Link>
       </nav>
     </div></header>
   );

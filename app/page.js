@@ -5,11 +5,10 @@ import { autoStatus, buildReport, STATUSES } from '@/lib/report';
 import Nav from './Nav';
 
 const todayStr = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-const blank = () => ({ location: '', date: todayStr(), wo: '', by: '', fault: '', finding: '', cat: '', acts: [], rca: '', rcaOther: '', remarks: '', statusMode: 'auto' });
+const blank = () => ({ location: '', date: todayStr(), wo: '', by: '', fault: '', finding: '', cat: '', acts: [], rcaCat: '', rca: '', rcaOther: '', remarks: '', statusMode: 'auto' });
 
 export default function Home() {
   const [cats, setCats] = useState([]);
-  const [rcas, setRcas] = useState([]);
   const [f, setF] = useState(blank());
   const [out, setOut] = useState('');
   const [errs, setErrs] = useState([]);
@@ -17,16 +16,17 @@ export default function Home() {
 
   useEffect(() => {
     supabase.from('action_categories').select('*').order('sort').then(({ data }) => setCats(data || []));
-    supabase.from('rcas').select('*').order('created_at').then(({ data }) => setRcas(data || []));
   }, []);
 
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const cat = cats.find((x) => x.name === f.cat);
+  const rcaCat = cats.find((x) => x.name === f.rcaCat);
   const rcaFinal = f.rca === 'Other' ? f.rcaOther.trim() : f.rca;
   const suggested = useMemo(() => autoStatus(f.acts, rcaFinal), [f.acts, rcaFinal]);
   const status = f.statusMode === 'auto' ? suggested : f.statusMode;
 
-  const pickCat = (name) => setF((p) => ({ ...p, cat: name, acts: [] }));
+  const pickCat = (name) => setF((p) => ({ ...p, cat: name, acts: [], rcaCat: p.rcaCat || name }));
+  const pickRcaCat = (name) => setF((p) => ({ ...p, rcaCat: name, rca: '', rcaOther: '' }));
   const toggle = (a) => setF((p) => ({ ...p, acts: p.acts.includes(a) ? p.acts.filter((x) => x !== a) : [...p.acts, a] }));
   const say = (t) => { setToast(t); setTimeout(() => setToast(''), 2200); };
 
@@ -95,11 +95,20 @@ export default function Home() {
 
         <section>
           <h2>4. Root cause analysis</h2>
-          <select value={f.rca} onChange={(e) => set('rca', e.target.value)} aria-label="RCA">
-            <option value="">Select RCA</option>
-            {rcas.map((x) => <option key={x.id} value={x.name}>{x.name}</option>)}
-            <option value="Other">Other</option>
-          </select>
+          <div className="tabs" role="group" aria-label="RCA category">
+            {cats.map((c) => <button key={c.id} type="button" className={'tab' + (f.rcaCat === c.name ? ' on' : '')} aria-pressed={f.rcaCat === c.name} onClick={() => pickRcaCat(c.name)}>{c.name}</button>)}
+          </div>
+          {!rcaCat && <p className="hint">Select a category, then choose the root cause.</p>}
+          {rcaCat && !(rcaCat.rca_options || []).length && <p className="hint">No root causes added for this category yet. Use Other or add them in Manage.</p>}
+          {rcaCat && (
+            <div className="checks">
+              {[...(rcaCat.rca_options || []), 'Other'].map((r) => (
+                <label key={r} className={f.rca === r ? 'on' : ''}>
+                  <input type="radio" name="rca" checked={f.rca === r} onChange={() => set('rca', r)} />{r}
+                </label>
+              ))}
+            </div>
+          )}
           {f.rca === 'Other' && (<><label htmlFor="ro">Enter RCA</label><input id="ro" value={f.rcaOther} onChange={(e) => set('rcaOther', e.target.value)} /></>)}
         </section>
 
