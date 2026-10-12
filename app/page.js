@@ -5,7 +5,7 @@ import { autoStatus, buildReport, STATUSES } from '@/lib/report';
 import Nav from './Nav';
 
 const todayStr = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-const blank = () => ({ location: '', date: todayStr(), wo: '', by: '', fault: '', finding: '', cat: '', acts: [], rcaCat: '', rca: '', rcaOther: '', remarks: '', statusMode: 'auto' });
+const blank = () => ({ location: '', date: todayStr(), wo: '', by: '', fault: '', finding: '', cat: '', acts: [], rcaCat: '', rcas: [], rcaOther: '', remarks: '', statusMode: 'auto' });
 
 export default function Home() {
   const [cats, setCats] = useState([]);
@@ -23,12 +23,14 @@ export default function Home() {
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const cat = cats.find((x) => x.name === f.cat);
   const rcaCat = cats.find((x) => x.name === f.rcaCat);
-  const rcaFinal = f.rca === 'Other' ? f.rcaOther.trim() : f.rca;
+  const rcaList = [...f.rcas.filter((r) => r !== 'Other'), ...(f.rcas.includes('Other') && f.rcaOther.trim() ? [f.rcaOther.trim()] : [])];
+  const rcaFinal = rcaList.join(', ');
   const suggested = useMemo(() => autoStatus(f.acts, rcaFinal), [f.acts, rcaFinal]);
   const status = f.statusMode === 'auto' ? suggested : f.statusMode;
 
   const pickCat = (name) => { setActQ(''); setRcaQ(''); setF((p) => ({ ...p, cat: name, acts: [], rcaCat: p.rcaCat || name })); };
-  const pickRcaCat = (name) => { setRcaQ(''); setF((p) => ({ ...p, rcaCat: name, rca: '', rcaOther: '' })); };
+  const pickRcaCat = (name) => { setRcaQ(''); setF((p) => ({ ...p, rcaCat: name, rcas: [], rcaOther: '' })); };
+  const toggleRca = (r) => setF((p) => ({ ...p, rcas: p.rcas.includes(r) ? p.rcas.filter((x) => x !== r) : [...p.rcas, r] }));
   const toggle = (a) => setF((p) => ({ ...p, acts: p.acts.includes(a) ? p.acts.filter((x) => x !== a) : [...p.acts, a] }));
   const say = (t) => { setToast(t); setTimeout(() => setToast(''), 2200); };
 
@@ -41,12 +43,12 @@ export default function Home() {
     if (!f.by.trim()) m.push('Reported By');
     if (!f.finding.trim()) m.push('Initial Fault Finding');
     if (!f.acts.length) m.push('At least one Action Taken');
-    if (!f.rca) m.push('RCA'); else if (f.rca === 'Other' && !f.rcaOther.trim()) m.push('RCA (enter the RCA)');
+    if (!f.rcas.length) m.push('RCA'); else if (f.rcas.includes('Other') && !f.rcaOther.trim()) m.push('RCA (enter the RCA)');
     setErrs(m);
     if (m.length) return;
     // keep checklist order in the report
     const acts = (cat?.actions || []).filter((a) => f.acts.includes(a));
-    const text = buildReport({ location: f.location.trim(), date: f.date, wo: f.wo.trim(), by: f.by.trim(), fault: f.fault.trim(), finding: f.finding.trim(), acts, rca: rcaFinal, status, remarks: f.remarks.trim() });
+    const text = buildReport({ location: f.location.trim(), date: f.date, wo: f.wo.trim(), by: f.by.trim(), fault: f.fault.trim(), finding: f.finding.trim(), acts, rca: rcaList, status, remarks: f.remarks.trim() });
     setOut(text);
     // save a copy for the team history (best effort)
     await supabase.from('reports').insert({ location: f.location.trim(), report_date: f.date, work_order: f.wo.trim(), reported_by: f.by.trim(), reported_fault: f.fault.trim(), finding: f.finding.trim(), actions: acts, rca: rcaFinal, status, remarks: f.remarks.trim() || null, report_text: text });
@@ -105,21 +107,22 @@ export default function Home() {
           <div className="tabs" role="group" aria-label="RCA category">
             {cats.map((c) => <button key={c.id} type="button" className={'tab' + (f.rcaCat === c.name ? ' on' : '')} aria-pressed={f.rcaCat === c.name} onClick={() => pickRcaCat(c.name)}>{c.name}</button>)}
           </div>
-          {!rcaCat && <p className="hint">Select a category, then choose the root cause.</p>}
+          {!rcaCat && <p className="hint">Select a category, then tick one or more root causes.</p>}
           {rcaCat && !(rcaCat.rca_options || []).length && <p className="hint">No root causes added for this category yet. Use Other or add them in Manage.</p>}
           {rcaCat && (rcaCat.rca_options || []).length > 0 && (
             <input className="search" type="search" placeholder="Search root causes..." aria-label="Search root causes" value={rcaQ} onChange={(e) => setRcaQ(e.target.value)} />
           )}
+          {f.rcas.length > 0 && <p className="hint">{f.rcas.length} root cause(s) ticked</p>}
           {rcaCat && (
             <div className="checks">
               {[...(rcaCat.rca_options || []).filter((r) => r.toLowerCase().includes(rcaQ.toLowerCase())), 'Other'].map((r) => (
-                <label key={r} className={f.rca === r ? 'on' : ''}>
-                  <input type="radio" name="rca" checked={f.rca === r} onChange={() => set('rca', r)} />{r}
+                <label key={r} className={f.rcas.includes(r) ? 'on' : ''}>
+                  <input type="checkbox" checked={f.rcas.includes(r)} onChange={() => toggleRca(r)} />{r}
                 </label>
               ))}
             </div>
           )}
-          {f.rca === 'Other' && (<><label htmlFor="ro">Enter RCA</label><input id="ro" value={f.rcaOther} onChange={(e) => set('rcaOther', e.target.value)} /></>)}
+          {f.rcas.includes('Other') && (<><label htmlFor="ro">Enter RCA</label><input id="ro" value={f.rcaOther} onChange={(e) => set('rcaOther', e.target.value)} /></>)}
         </section>
 
         <section>
